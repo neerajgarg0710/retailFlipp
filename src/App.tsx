@@ -21,6 +21,35 @@ const initialCouponState: NewCoupon = {
   endAt: ''
 }
 
+const sanitizeStoreSlug = (storeName: string) =>
+  storeName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+const getFileExtension = (file: File) => {
+  const fileNameExtension = file.name.split('.').pop()?.toLowerCase()
+
+  if (fileNameExtension) {
+    return fileNameExtension
+  }
+
+  if (file.type === 'image/png') {
+    return 'png'
+  }
+
+  if (file.type === 'image/jpeg') {
+    return 'jpg'
+  }
+
+  if (file.type === 'image/webp') {
+    return 'webp'
+  }
+
+  return 'png'
+}
+
 function App() {
   const location = useLocation()
   const [coupons, setCoupons] = useState<Coupon[]>([])
@@ -63,25 +92,33 @@ function App() {
   }
 
   const uploadStoreLogo = async (storeSlug: string, file: File) => {
-    const extension = file.name.split('.').pop() ?? 'png'
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Logo upload only supports image files.')
+    }
+
+    const extension = getFileExtension(file)
     const filename = `${storeSlug}-${Date.now()}.${extension}`
     const { data, error } = await supabase.storage
       .from('logos')
-      .upload(filename, file, { cacheControl: '3600', upsert: false })
+      .upload(filename, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || `image/${extension}`
+      })
 
     if (error) {
-      throw error
+      throw new Error(`Logo upload failed: ${error.message}`)
     }
 
     const { data: publicUrlData } = supabase.storage
       .from('logos')
-      .getPublicUrl(filename)
+      .getPublicUrl(data.path)
 
     return publicUrlData.publicUrl
   }
 
   const createOrGetStoreId = async (storeName: string, logoUrl: string, logoFile: File | null) => {
-    const slug = storeName.trim().toLowerCase().replace(/\s+/g, '-')
+    const slug = sanitizeStoreSlug(storeName)
     const { data: existingStores, error: fetchError } = await supabase
       .from('stores')
       .select('id, logo_url')
@@ -153,7 +190,8 @@ function App() {
       fetchCoupons()
     } catch (error) {
       console.error('Add coupon failed:', error)
-      alert('Unable to add coupon. Check console for details.')
+      const message = error instanceof Error ? error.message : 'Unable to add coupon.'
+      alert(message)
     }
   }
 

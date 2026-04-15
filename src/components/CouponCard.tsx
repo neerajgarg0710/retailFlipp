@@ -12,45 +12,43 @@ const formatDiscount = (discountType: string | null | undefined) => {
 export default function CouponCard({ coupon }: CouponCardProps) {
   const expiration = new Date(coupon.end_at).toLocaleDateString()
   const discountLabel = formatDiscount(coupon.discount_type)
+  const storeName = coupon.stores?.name ?? 'Unknown store'
+  const logoUrl = coupon.stores?.logo_url
+  const fallbackInitial = storeName.charAt(0).toUpperCase()
+  const valueLabel = coupon.discount_value ? `${coupon.discount_value} ${discountLabel}` : discountLabel
+  const codeLabel = coupon.coupon_code ?? 'Coupon code'
 
   return (
     <div className="coupon-card">
-      <div className="coupon-card-top">
-        <div>
-          <p className="coupon-store">{coupon.stores?.name ?? 'Unknown store'}</p>
-          <h2>{coupon.title}</h2>
+      <div className="coupon-card-hero">
+        <span className="coupon-badge">{valueLabel}</span>
+        <div className="coupon-logo-shell">
+          {logoUrl ? (
+            <img className="coupon-store-logo" src={logoUrl} alt={`${storeName} logo`} />
+          ) : (
+            <div className="coupon-store-logo coupon-store-logo-fallback" aria-hidden="true">
+              {fallbackInitial}
+            </div>
+          )}
         </div>
-        <span className="coupon-badge">{discountLabel}</span>
       </div>
 
-      <p className="coupon-description">{coupon.description ?? 'Save with this offer today.'}</p>
+      <div className="coupon-divider" />
 
-      <div className="coupon-meta">
+      <div className="coupon-card-body">
+        <p className="coupon-store">{storeName}</p>
+        <h2>{coupon.title}</h2>
+        <button className="coupon-code-pill" type="button">
+          {codeLabel}
+        </button>
+      </div>
+
+      <div className="coupon-meta compact">
         <span className={`coupon-tag ${coupon.is_verified ? 'verified' : 'unverified'}`}>
           {coupon.is_verified ? 'Verified' : 'Unverified'}
         </span>
         {coupon.is_exclusive && <span className="coupon-tag exclusive">Exclusive</span>}
         <span className="coupon-expiry">Expires {expiration}</span>
-      </div>
-
-      <div className="coupon-code-block">
-        <div>
-          <span>Coupon Code</span>
-          <strong>{coupon.coupon_code ?? 'AUTO APPLY'}</strong>
-        </div>
-        <div className="coupon-value">{coupon.discount_value ?? 'Save now'}</div>
-      </div>
-
-      <div className="coupon-footer">
-        {coupon.url ? (
-          <a href={coupon.url} target="_blank" rel="noreferrer" className="coupon-action">
-            Show Deal
-          </a>
-        ) : (
-          <button className="coupon-action disabled" disabled>
-            No Link
-          </button>
-        )}
       </div>
     </div>
   )

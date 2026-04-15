@@ -9,6 +9,31 @@ DROP TABLE IF EXISTS stores;
 DROP TYPE IF EXISTS discount_type;
 DROP TYPE IF EXISTS coupon_status;
 
+DROP POLICY IF EXISTS "Public can view logos" ON storage.objects;
+DROP POLICY IF EXISTS "Public can upload logos" ON storage.objects;
+DROP POLICY IF EXISTS "Public can update logos" ON storage.objects;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'logos') THEN
+    UPDATE storage.buckets
+    SET
+      name = 'logos',
+      public = TRUE,
+      file_size_limit = 5242880,
+      allowed_mime_types = ARRAY['image/png', 'image/jpeg', 'image/webp']
+    WHERE id = 'logos';
+  ELSE
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES (
+      'logos',
+      'logos',
+      TRUE,
+      5242880,
+      ARRAY['image/png', 'image/jpeg', 'image/webp']
+    );
+  END IF;
+END $$;
+
 -- Create enum types for coupon discount and status
 CREATE TYPE discount_type AS ENUM ('PERCENT', 'FIXED', 'FREE_SHIPPING', 'CASHBACK');
 CREATE TYPE coupon_status AS ENUM ('ACTIVE', 'EXPIRED', 'DISABLED');
@@ -72,3 +97,19 @@ CREATE TABLE coupon_stats (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE POLICY "Public can view logos"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'logos');
+
+CREATE POLICY "Public can upload logos"
+ON storage.objects FOR INSERT
+TO public
+WITH CHECK (bucket_id = 'logos');
+
+CREATE POLICY "Public can update logos"
+ON storage.objects FOR UPDATE
+TO public
+USING (bucket_id = 'logos')
+WITH CHECK (bucket_id = 'logos');
