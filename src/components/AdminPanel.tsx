@@ -1,15 +1,16 @@
-import type { FormEvent } from 'react'
+import type { FormEvent, ChangeEvent } from 'react'
 import type { NewCoupon, DiscountType } from '../types'
 
 interface AdminPanelProps {
   coupon: NewCoupon
-  onChange: (field: keyof NewCoupon, value: string) => void
+  onChange: (field: keyof NewCoupon, value: string | File | null) => void
+  onFileChange: (file: File | null) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
 const discountTypes: DiscountType[] = ['PERCENT', 'FIXED', 'FREE_SHIPPING', 'CASHBACK']
 
-export default function AdminPanel({ coupon, onChange, onSubmit }: AdminPanelProps) {
+export default function AdminPanel({ coupon, onChange, onFileChange, onSubmit }: AdminPanelProps) {
   return (
     <div className="admin-panel">
       <h2>Add New Coupon</h2>
@@ -28,6 +29,20 @@ export default function AdminPanel({ coupon, onChange, onSubmit }: AdminPanelPro
           onChange={(e) => onChange('storeName', e.target.value)}
           required
         />
+        <input
+          type="url"
+          placeholder="Store logo URL (optional)"
+          value={coupon.logoUrl}
+          onChange={(e) => onChange('logoUrl', e.target.value)}
+        />
+        <label className="file-upload-label">
+          Store logo upload (optional)
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e: ChangeEvent<HTMLInputElement>) => onFileChange(e.target.files?.[0] ?? null)}
+          />
+        </label>
         <select
           value={coupon.discountType}
           onChange={(e) => onChange('discountType', e.target.value)}

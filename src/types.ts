@@ -4,6 +4,7 @@ export type CouponStatus = 'ACTIVE' | 'EXPIRED' | 'DISABLED'
 export interface Store {
   id: string
   name: string
+  logo_url?: string | null
 }
 
 export interface Coupon {
@@ -26,6 +27,8 @@ export interface Coupon {
 export interface NewCoupon {
   title: string
   storeName: string
+  logoUrl: string
+  logoFile: File | null
   discountType: DiscountType
   discountValue: string
   code: string

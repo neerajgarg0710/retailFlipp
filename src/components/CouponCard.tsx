@@ -4,22 +4,54 @@ interface CouponCardProps {
   coupon: Coupon
 }
 
+const formatDiscount = (discountType: string | null | undefined) => {
+  if (!discountType) return 'Deal'
+  return discountType.replace('_', ' ').toLowerCase()
+}
+
 export default function CouponCard({ coupon }: CouponCardProps) {
+  const expiration = new Date(coupon.end_at).toLocaleDateString()
+  const discountLabel = formatDiscount(coupon.discount_type)
+
   return (
     <div className="coupon-card">
-      <h2>{coupon.title}</h2>
-      <p><strong>Store:</strong> {coupon.stores?.name ?? 'Unknown store'}</p>
-      <p><strong>Type:</strong> {coupon.discount_type ?? 'Deal'}</p>
-      {coupon.discount_value && <p><strong>Value:</strong> {coupon.discount_value}</p>}
-      {coupon.coupon_code && <p><strong>Code:</strong> {coupon.coupon_code}</p>}
-      {coupon.url && (
-        <p>
-          <strong>Link:</strong> <a href={coupon.url} target="_blank" rel="noreferrer">Visit</a>
-        </p>
-      )}
-      <p>{coupon.description}</p>
-      <p><strong>Expires:</strong> {new Date(coupon.end_at).toLocaleDateString()}</p>
-      <p><strong>Status:</strong> {coupon.status}</p>
+      <div className="coupon-card-top">
+        <div>
+          <p className="coupon-store">{coupon.stores?.name ?? 'Unknown store'}</p>
+          <h2>{coupon.title}</h2>
+        </div>
+        <span className="coupon-badge">{discountLabel}</span>
+      </div>
+
+      <p className="coupon-description">{coupon.description ?? 'Save with this offer today.'}</p>
+
+      <div className="coupon-meta">
+        <span className={`coupon-tag ${coupon.is_verified ? 'verified' : 'unverified'}`}>
+          {coupon.is_verified ? 'Verified' : 'Unverified'}
+        </span>
+        {coupon.is_exclusive && <span className="coupon-tag exclusive">Exclusive</span>}
+        <span className="coupon-expiry">Expires {expiration}</span>
+      </div>
+
+      <div className="coupon-code-block">
+        <div>
+          <span>Coupon Code</span>
+          <strong>{coupon.coupon_code ?? 'AUTO APPLY'}</strong>
+        </div>
+        <div className="coupon-value">{coupon.discount_value ?? 'Save now'}</div>
+      </div>
+
+      <div className="coupon-footer">
+        {coupon.url ? (
+          <a href={coupon.url} target="_blank" rel="noreferrer" className="coupon-action">
+            Show Deal
+          </a>
+        ) : (
+          <button className="coupon-action disabled" disabled>
+            No Link
+          </button>
+        )}
+      </div>
     </div>
   )
 }

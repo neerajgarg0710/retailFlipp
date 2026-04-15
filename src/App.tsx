@@ -11,6 +11,8 @@ import SearchBar from './components/SearchBar'
 const initialCouponState: NewCoupon = {
   title: '',
   storeName: '',
+  logoUrl: '',
+  logoFile: null,
   discountType: 'PERCENT',
   discountValue: '',
   code: '',
@@ -45,7 +47,7 @@ function App() {
   const fetchCoupons = async () => {
     const { data, error } = await supabase
       .from<Coupon>('coupons')
-      .select('*, stores(name)')
+      .select('*, stores(name, logo_url)')
       .order('end_at', { ascending: true })
 
     if (error) {
@@ -56,15 +58,33 @@ function App() {
     setCoupons(data ?? [])
   }
 
-  const handleFieldChange = (field: keyof NewCoupon, value: string) => {
+  const handleFieldChange = (field: keyof NewCoupon, value: string | File | null) => {
     setNewCoupon((current) => ({ ...current, [field]: value }))
   }
 
-  const createOrGetStoreId = async (storeName: string) => {
+  const uploadStoreLogo = async (storeSlug: string, file: File) => {
+    const extension = file.name.split('.').pop() ?? 'png'
+    const filename = `${storeSlug}-${Date.now()}.${extension}`
+    const { data, error } = await supabase.storage
+      .from('logos')
+      .upload(filename, file, { cacheControl: '3600', upsert: false })
+
+    if (error) {
+      throw error
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('logos')
+      .getPublicUrl(filename)
+
+    return publicUrlData.publicUrl
+  }
+
+  const createOrGetStoreId = async (storeName: string, logoUrl: string, logoFile: File | null) => {
     const slug = storeName.trim().toLowerCase().replace(/\s+/g, '-')
     const { data: existingStores, error: fetchError } = await supabase
       .from('stores')
-      .select('id')
+      .select('id, logo_url')
       .eq('slug', slug)
       .limit(1)
 
@@ -73,12 +93,24 @@ function App() {
     }
 
     if (existingStores && existingStores.length > 0) {
-      return existingStores[0].id
+      const store = existingStores[0]
+      if (logoFile) {
+        const uploadedUrl = await uploadStoreLogo(slug, logoFile)
+        await supabase.from('stores').update({ logo_url: uploadedUrl }).eq('id', store.id)
+      } else if (logoUrl && store.logo_url !== logoUrl) {
+        await supabase.from('stores').update({ logo_url: logoUrl }).eq('id', store.id)
+      }
+      return store.id
+    }
+
+    let logoPath = logoUrl || null
+    if (!logoPath && logoFile) {
+      logoPath = await uploadStoreLogo(slug, logoFile)
     }
 
     const { data: insertedStore, error: insertError } = await supabase
       .from('stores')
-      .insert([{ name: storeName, slug }])
+      .insert([{ name: storeName, slug, logo_url: logoPath }])
       .select('id')
       .single()
 
@@ -93,7 +125,7 @@ function App() {
     event.preventDefault()
 
     try {
-      const storeId = await createOrGetStoreId(newCoupon.storeName)
+      const storeId = await createOrGetStoreId(newCoupon.storeName, newCoupon.logoUrl, newCoupon.logoFile)
       const { error } = await supabase.from('coupons').insert([
         {
           store_id: storeId,
@@ -144,7 +176,7 @@ function App() {
           <Link to="/" className="admin-btn">Back to Main</Link>
         </header>
         <main>
-          <AdminPanel coupon={newCoupon} onChange={handleFieldChange} onSubmit={handleAddCoupon} />
+          <AdminPanel coupon={newCoupon} onChange={handleFieldChange} onFileChange={(file) => handleFieldChange('logoFile', file)} onSubmit={handleAddCoupon} />
         </main>
       </div>
     )
@@ -152,18 +184,73 @@ function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Retail Flipp</h1>
-        <p>Find the best coupons and deals</p>
-        <SearchBar value={searchTerm} onChange={setSearchTerm} />
+      <header className="hero-header">
+        <div className="top-panel">
+          <div className="brand-line">
+            <span className="brand-mark">Retail</span>
+            <span className="brand-name">Flipp</span>
+          </div>
+          <div className="top-panel-search">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} />
+          </div>
+          <div className="top-panel-links">
+            <a href="#stores">Stores</a>
+            <a href="#categories">Categories</a>
+            <a href="#deals">Deals</a>
+          </div>
+        </div>
+
+        <div className="hero-content">
+          <div>
+            <p className="eyebrow">Trusted Canadian coupon hub</p>
+            <h1>Save on top brands with verified promo codes</h1>
+            <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
+          </div>
+        </div>
       </header>
+
       <main>
-        <div className="coupons-grid">
+        <section className="coupons-grid" id="deals">
           {filteredCoupons.map((coupon) => (
             <CouponCard key={coupon.id} coupon={coupon} />
           ))}
-        </div>
+        </section>
       </main>
+
+      <footer className="site-footer">
+        <div className="footer-grid">
+          <div>
+            <h3>Retail Flipp</h3>
+            <p>Canada's best coupon finder for verified codes, deals, and savings.</p>
+          </div>
+          <div>
+            <h4>Shop</h4>
+            <a href="#stores">Browse Stores</a>
+            <a href="#categories">Browse Categories</a>
+            <a href="#deals">Top Deals</a>
+          </div>
+          <div>
+            <h4>Company</h4>
+            <a href="#about">About</a>
+            <a href="#">Careers</a>
+            <a href="#">Blog</a>
+          </div>
+          <div>
+            <h4>Support</h4>
+            <a href="#">Submit a Coupon</a>
+            <a href="#">Get Help</a>
+            <a href="#">Terms</a>
+          </div>
+        </div>
+        <div className="footer-bar">
+          <p>© 2026 Retail Flipp. All rights reserved.</p>
+          <div className="social-links">
+            <a href="#">Facebook</a>
+            <a href="#">Instagram</a>
+            <a href="#">Pinterest</a>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
