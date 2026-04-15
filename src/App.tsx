@@ -63,11 +63,39 @@ const getFileExtension = (file: File) => {
   return 'png'
 }
 
+const isCouponExpired = (coupon: Pick<Coupon, 'end_at' | 'status'>) =>
+  coupon.status === 'EXPIRED' || new Date(coupon.end_at).getTime() < Date.now()
+
+const getCouponDiscountScore = (coupon: Pick<Coupon, 'discount_type' | 'discount_value'>) => {
+  if (!coupon.discount_value) {
+    return coupon.discount_type === 'FREE_SHIPPING' ? 1 : 0
+  }
+
+  const parsedValue = Number(coupon.discount_value)
+
+  if (Number.isNaN(parsedValue)) {
+    return 0
+  }
+
+  switch (coupon.discount_type) {
+    case 'PERCENT':
+      return parsedValue + 1000
+    case 'FIXED':
+      return parsedValue + 500
+    case 'CASHBACK':
+      return parsedValue + 250
+    default:
+      return parsedValue
+  }
+}
+
 function App() {
   const location = useLocation()
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortOption, setSortOption] = useState<'newest' | 'expiring' | 'best-discount'>('expiring')
+  const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [selectedStoreSlug, setSelectedStoreSlug] = useState<string | null>(null)
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null)
   const [openFilterMenu, setOpenFilterMenu] = useState<'stores' | 'categories' | null>(null)
@@ -94,6 +122,17 @@ function App() {
   }, [location.pathname, isLoggedIn])
 
   const fetchCoupons = async () => {
+    const nowIso = new Date().toISOString()
+    const { error: expireError } = await supabase
+      .from('coupons')
+      .update({ status: 'EXPIRED' })
+      .eq('status', 'ACTIVE')
+      .lt('end_at', nowIso)
+
+    if (expireError) {
+      console.error('Error expiring coupons:', expireError)
+    }
+
     const { data, error } = await supabase
       .from('coupons')
       .select('*, stores(id, name, slug, logo_url), coupon_categories(categories(id, name, slug))')
@@ -104,7 +143,18 @@ function App() {
       return
     }
 
-    setCoupons((data as Coupon[]) ?? [])
+    const sortedCoupons = ((data as Coupon[]) ?? []).sort((a, b) => {
+      const aExpired = isCouponExpired(a)
+      const bExpired = isCouponExpired(b)
+
+      if (aExpired !== bExpired) {
+        return aExpired ? 1 : -1
+      }
+
+      return new Date(a.end_at).getTime() - new Date(b.end_at).getTime()
+    })
+
+    setCoupons(sortedCoupons)
   }
 
   const fetchCategories = async () => {
@@ -354,19 +404,42 @@ function App() {
     }
   }
 
-  const filteredCoupons = coupons.filter((coupon) => {
+  const filteredCoupons = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase()
-    const storeMatch = selectedStoreSlug ? coupon.stores?.slug === selectedStoreSlug : true
-    const categoryMatch = selectedCategorySlug
-      ? (coupon.coupon_categories ?? []).some((link) => link.categories?.slug === selectedCategorySlug)
-      : true
-    const searchMatch =
-      coupon.title.toLowerCase().includes(lowerSearch) ||
-      coupon.stores?.name.toLowerCase().includes(lowerSearch) ||
-      (coupon.coupon_categories ?? []).some((link) => link.categories?.name.toLowerCase().includes(lowerSearch))
 
-    return storeMatch && categoryMatch && searchMatch
-  })
+    const matchingCoupons = coupons.filter((coupon) => {
+      const storeMatch = selectedStoreSlug ? coupon.stores?.slug === selectedStoreSlug : true
+      const categoryMatch = selectedCategorySlug
+        ? (coupon.coupon_categories ?? []).some((link) => link.categories?.slug === selectedCategorySlug)
+        : true
+      const verifiedMatch = verifiedOnly ? coupon.is_verified : true
+      const searchMatch =
+        coupon.title.toLowerCase().includes(lowerSearch) ||
+        coupon.stores?.name.toLowerCase().includes(lowerSearch) ||
+        (coupon.coupon_categories ?? []).some((link) => link.categories?.name.toLowerCase().includes(lowerSearch))
+
+      return storeMatch && categoryMatch && verifiedMatch && searchMatch
+    })
+
+    return matchingCoupons.sort((a, b) => {
+      const aExpired = isCouponExpired(a)
+      const bExpired = isCouponExpired(b)
+
+      if (aExpired !== bExpired) {
+        return aExpired ? 1 : -1
+      }
+
+      if (sortOption === 'newest') {
+        return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+      }
+
+      if (sortOption === 'best-discount') {
+        return getCouponDiscountScore(b) - getCouponDiscountScore(a)
+      }
+
+      return new Date(a.end_at).getTime() - new Date(b.end_at).getTime()
+    })
+  }, [coupons, searchTerm, selectedStoreSlug, selectedCategorySlug, verifiedOnly, sortOption])
 
   if (location.pathname === '/admin') {
     if (!isLoggedIn) {
@@ -458,10 +531,14 @@ function App() {
               </button>
               {openFilterMenu === 'stores' && (
                 <div className="header-filter-menu">
-                  <button type="button" className="header-filter-option" onClick={() => {
-                    setSelectedStoreSlug(null)
-                    setOpenFilterMenu(null)
-                  }}>
+                  <button
+                    type="button"
+                    className="header-filter-option"
+                    onClick={() => {
+                      setSelectedStoreSlug(null)
+                      setOpenFilterMenu(null)
+                    }}
+                  >
                     All Stores
                   </button>
                   {stores.map((store) => (
@@ -490,10 +567,14 @@ function App() {
               </button>
               {openFilterMenu === 'categories' && (
                 <div className="header-filter-menu">
-                  <button type="button" className="header-filter-option" onClick={() => {
-                    setSelectedCategorySlug(null)
-                    setOpenFilterMenu(null)
-                  }}>
+                  <button
+                    type="button"
+                    className="header-filter-option"
+                    onClick={() => {
+                      setSelectedCategorySlug(null)
+                      setOpenFilterMenu(null)
+                    }}
+                  >
                     All Categories
                   </button>
                   {visibleCategories.map((category) => (
@@ -518,22 +599,60 @@ function App() {
         <div className="hero-content">
           <div>
             <p className="eyebrow">Trusted Canadian coupon hub</p>
-            {/* <h4>Save on top brands with verified promo codes</h4> */}
             <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
           </div>
         </div>
       </header>
 
       <main>
+        <section className="browse-controls">
+          <div className="browse-sort">
+            <span className="browse-label">Sort</span>
+            <button
+              type="button"
+              className={`browse-chip ${sortOption === 'newest' ? 'active' : ''}`}
+              onClick={() => setSortOption('newest')}
+            >
+              Newest
+            </button>
+            <button
+              type="button"
+              className={`browse-chip ${sortOption === 'expiring' ? 'active' : ''}`}
+              onClick={() => setSortOption('expiring')}
+            >
+              Expiring Soon
+            </button>
+            <button
+              type="button"
+              className={`browse-chip ${sortOption === 'best-discount' ? 'active' : ''}`}
+              onClick={() => setSortOption('best-discount')}
+            >
+              Best Discount
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`browse-chip browse-toggle ${verifiedOnly ? 'active' : ''}`}
+            onClick={() => setVerifiedOnly((current) => !current)}
+          >
+            Verified Only
+          </button>
+        </section>
+
         <section className="active-filters">
           {selectedStoreSlug && (
             <button type="button" className="active-filter-chip" onClick={() => setSelectedStoreSlug(null)}>
-              Store: {stores.find((store) => store.slug === selectedStoreSlug)?.name} ×
+              Store: {stores.find((store) => store.slug === selectedStoreSlug)?.name} x
             </button>
           )}
           {selectedCategorySlug && (
             <button type="button" className="active-filter-chip" onClick={() => setSelectedCategorySlug(null)}>
-              Category: {visibleCategories.find((category) => category.slug === selectedCategorySlug)?.name ?? categories.find((category) => category.slug === selectedCategorySlug)?.name} ×
+              Category: {visibleCategories.find((category) => category.slug === selectedCategorySlug)?.name ?? categories.find((category) => category.slug === selectedCategorySlug)?.name} x
+            </button>
+          )}
+          {verifiedOnly && (
+            <button type="button" className="active-filter-chip" onClick={() => setVerifiedOnly(false)}>
+              Verified Only x
             </button>
           )}
         </section>

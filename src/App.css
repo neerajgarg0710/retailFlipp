@@ -184,6 +184,47 @@
   margin-bottom: 12px;
 }
 
+.browse-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.browse-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.browse-label {
+  color: #6e5a89;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.browse-chip {
+  padding: 8px 12px;
+  border: 1px solid #e1ccef;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b22a2;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.browse-chip.active {
+  background: #f7effd;
+  border-color: #cda9ea;
+}
+
+.browse-toggle {
+  white-space: nowrap;
+}
+
 .active-filter-chip {
   padding: 8px 12px;
   border: 1px solid #e1ccef;
@@ -281,6 +322,16 @@
   transform: translateY(-3px);
   border-color: #cda9ea;
   box-shadow: 0 18px 40px rgba(118, 44, 178, 0.16);
+}
+
+.coupon-card-expired {
+  opacity: 0.72;
+}
+
+.coupon-card-expired:hover {
+  transform: none;
+  border-color: #dbc7ef;
+  box-shadow: 0 14px 34px rgba(118, 44, 178, 0.1);
 }
 
 .coupon-card-hero {
@@ -396,6 +447,21 @@
   box-shadow: inset 0 0 0 1px rgba(123, 34, 179, 0.08);
 }
 
+.coupon-code-pill.copyable {
+  cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.coupon-code-pill.copyable:hover {
+  transform: translateY(-1px);
+  background: #eedffd;
+  box-shadow: inset 0 0 0 1px rgba(123, 34, 179, 0.14);
+}
+
+.coupon-code-pill.static {
+  opacity: 0.78;
+}
+
 .coupon-meta {
   display: flex;
   flex-wrap: wrap;
@@ -433,6 +499,11 @@
 .coupon-tag.exclusive {
   background: #f0e8ff;
   color: #6c38c6;
+}
+
+.coupon-tag.expired {
+  background: #f3e8e8;
+  color: #9a4545;
 }
 
 .coupon-expiry {
