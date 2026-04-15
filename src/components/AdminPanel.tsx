@@ -3,17 +3,29 @@ import type { NewCoupon, DiscountType } from '../types'
 
 interface AdminPanelProps {
   coupon: NewCoupon
-  onChange: (field: keyof NewCoupon, value: string | File | null) => void
+  isEditing: boolean
+  onChange: (field: keyof NewCoupon, value: string | boolean | File | null) => void
+  onCancelEdit: () => void
   onFileChange: (file: File | null) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
 const discountTypes: DiscountType[] = ['PERCENT', 'FIXED', 'FREE_SHIPPING', 'CASHBACK']
 
-export default function AdminPanel({ coupon, onChange, onFileChange, onSubmit }: AdminPanelProps) {
+export default function AdminPanel({ coupon, isEditing, onChange, onCancelEdit, onFileChange, onSubmit }: AdminPanelProps) {
   return (
     <div className="admin-panel">
-      <h2>Add New Coupon</h2>
+      <div className="admin-form-header">
+        <div>
+          <h2>{isEditing ? 'Edit Coupon' : 'Add New Coupon'}</h2>
+          <p>{isEditing ? 'Update the selected coupon and save the changes.' : 'Create a new coupon and publish it to the live list.'}</p>
+        </div>
+        {isEditing && (
+          <button type="button" className="admin-secondary-btn" onClick={onCancelEdit}>
+            Cancel Edit
+          </button>
+        )}
+      </div>
       <form onSubmit={onSubmit} className="coupon-form">
         <input
           type="text"
@@ -78,13 +90,29 @@ export default function AdminPanel({ coupon, onChange, onFileChange, onSubmit }:
           onChange={(e) => onChange('description', e.target.value)}
           required
         />
+        <label className="admin-checkbox">
+          <input
+            type="checkbox"
+            checked={coupon.isVerified}
+            onChange={(e) => onChange('isVerified', e.target.checked)}
+          />
+          Verified coupon
+        </label>
+        <label className="admin-checkbox">
+          <input
+            type="checkbox"
+            checked={coupon.isExclusive}
+            onChange={(e) => onChange('isExclusive', e.target.checked)}
+          />
+          Exclusive offer
+        </label>
         <input
           type="date"
           value={coupon.endAt}
           onChange={(e) => onChange('endAt', e.target.value)}
           required
         />
-        <button type="submit">Add Coupon</button>
+        <button type="submit">{isEditing ? 'Update Coupon' : 'Add Coupon'}</button>
       </form>
     </div>
   )

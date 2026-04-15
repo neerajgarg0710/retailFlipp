@@ -35,4 +35,6 @@ export interface NewCoupon {
   description: string
   url: string
   endAt: string
+  isVerified: boolean
+  isExclusive: boolean
 }

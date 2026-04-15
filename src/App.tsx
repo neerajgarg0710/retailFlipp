@@ -18,7 +18,9 @@ const initialCouponState: NewCoupon = {
   code: '',
   description: '',
   url: '',
-  endAt: ''
+  endAt: '',
+  isVerified: false,
+  isExclusive: false
 }
 
 const faqItems = [
@@ -74,6 +76,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [newCoupon, setNewCoupon] = useState<NewCoupon>(initialCouponState)
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
+  const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCoupons()
@@ -86,7 +90,7 @@ function App() {
         setIsLoggedIn(true)
       } else {
         alert('Incorrect password')
-        window.location.href = '/' // Redirect to main
+        window.location.href = '/'
       }
     }
   }, [location.pathname, isLoggedIn])
@@ -105,8 +109,13 @@ function App() {
     setCoupons(data ?? [])
   }
 
-  const handleFieldChange = (field: keyof NewCoupon, value: string | File | null) => {
+  const handleFieldChange = (field: keyof NewCoupon, value: string | boolean | File | null) => {
     setNewCoupon((current) => ({ ...current, [field]: value }))
+  }
+
+  const resetCouponForm = () => {
+    setNewCoupon(initialCouponState)
+    setEditingCouponId(null)
   }
 
   const uploadStoreLogo = async (storeSlug: string, file: File) => {
@@ -176,40 +185,95 @@ function App() {
     return insertedStore.id
   }
 
-  const handleAddCoupon = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveCoupon = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     try {
       const storeId = await createOrGetStoreId(newCoupon.storeName, newCoupon.logoUrl, newCoupon.logoFile)
-      const { error } = await supabase.from('coupons').insert([
-        {
-          store_id: storeId,
-          title: newCoupon.title,
-          description: newCoupon.description,
-          coupon_code: newCoupon.code || null,
-          discount_type: newCoupon.discountType,
-          discount_value: newCoupon.discountType === 'FREE_SHIPPING' ? null : newCoupon.discountValue || null,
-          url: newCoupon.url || null,
-          end_at: newCoupon.endAt,
-          is_verified: false,
-          is_exclusive: false,
-          status: 'ACTIVE'
-        }
-      ])
+      const payload = {
+        store_id: storeId,
+        title: newCoupon.title,
+        description: newCoupon.description,
+        coupon_code: newCoupon.code || null,
+        discount_type: newCoupon.discountType,
+        discount_value: newCoupon.discountType === 'FREE_SHIPPING' ? null : newCoupon.discountValue || null,
+        url: newCoupon.url || null,
+        end_at: newCoupon.endAt,
+        is_verified: newCoupon.isVerified,
+        is_exclusive: newCoupon.isExclusive
+      }
+
+      const { error } = editingCouponId
+        ? await supabase.from('coupons').update(payload).eq('id', editingCouponId)
+        : await supabase.from('coupons').insert([
+            {
+              ...payload,
+              status: 'ACTIVE'
+            }
+          ])
 
       if (error) {
-        console.error('Error adding coupon:', error)
-        alert('Error adding coupon')
+        console.error('Error saving coupon:', error)
+        alert('Error saving coupon')
         return
       }
 
-      alert('Coupon added successfully')
-      setNewCoupon(initialCouponState)
+      alert(editingCouponId ? 'Coupon updated successfully' : 'Coupon added successfully')
+      resetCouponForm()
       fetchCoupons()
     } catch (error) {
-      console.error('Add coupon failed:', error)
-      const message = error instanceof Error ? error.message : 'Unable to add coupon.'
+      console.error('Save coupon failed:', error)
+      const message = error instanceof Error ? error.message : 'Unable to save coupon.'
       alert(message)
+    }
+  }
+
+  const handleEditCoupon = (coupon: Coupon) => {
+    setEditingCouponId(coupon.id)
+    setNewCoupon({
+      title: coupon.title,
+      storeName: coupon.stores?.name ?? '',
+      logoUrl: coupon.stores?.logo_url ?? '',
+      logoFile: null,
+      discountType: coupon.discount_type ?? 'PERCENT',
+      discountValue: coupon.discount_value ?? '',
+      code: coupon.coupon_code ?? '',
+      description: coupon.description ?? '',
+      url: coupon.url ?? '',
+      endAt: coupon.end_at.slice(0, 10),
+      isVerified: coupon.is_verified,
+      isExclusive: coupon.is_exclusive
+    })
+
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteCoupon = async (couponId: string) => {
+    const shouldDelete = window.confirm('Delete this coupon? This action cannot be undone.')
+
+    if (!shouldDelete) {
+      return
+    }
+
+    try {
+      setDeletingCouponId(couponId)
+      const { error } = await supabase.from('coupons').delete().eq('id', couponId)
+
+      if (error) {
+        throw error
+      }
+
+      setCoupons((current) => current.filter((coupon) => coupon.id !== couponId))
+      if (editingCouponId === couponId) {
+        resetCouponForm()
+      }
+      alert('Coupon deleted successfully')
+    } catch (error) {
+      console.error('Delete coupon failed:', error)
+      const message = error instanceof Error ? error.message : 'Unable to delete coupon.'
+      alert(message)
+    } finally {
+      setDeletingCouponId(null)
     }
   }
 
@@ -223,8 +287,9 @@ function App() {
 
   if (location.pathname === '/admin') {
     if (!isLoggedIn) {
-      return <div>Authenticating...</div> // Temporary while prompt shows
+      return <div>Authenticating...</div>
     }
+
     return (
       <div className="app">
         <header>
@@ -232,7 +297,59 @@ function App() {
           <Link to="/" className="admin-btn">Back to Main</Link>
         </header>
         <main>
-          <AdminPanel coupon={newCoupon} onChange={handleFieldChange} onFileChange={(file) => handleFieldChange('logoFile', file)} onSubmit={handleAddCoupon} />
+          <AdminPanel
+            coupon={newCoupon}
+            isEditing={editingCouponId !== null}
+            onChange={handleFieldChange}
+            onCancelEdit={resetCouponForm}
+            onFileChange={(file) => handleFieldChange('logoFile', file)}
+            onSubmit={handleSaveCoupon}
+          />
+          <section className="admin-panel admin-coupon-list">
+            <div className="admin-list-header">
+              <div>
+                <h2>Existing Coupons</h2>
+                <p>Review current coupons, update their details, or remove outdated offers.</p>
+              </div>
+              <span className="admin-count">{coupons.length} total</span>
+            </div>
+
+            <div className="admin-list-items">
+              {coupons.length === 0 ? (
+                <p className="admin-empty-state">No coupons found yet.</p>
+              ) : (
+                coupons.map((coupon) => (
+                  <article key={coupon.id} className="admin-coupon-item">
+                    <div className="admin-coupon-copy">
+                      <p className="admin-coupon-store">{coupon.stores?.name ?? 'Unknown store'}</p>
+                      <h3>{coupon.title}</h3>
+                      <p className="admin-coupon-meta">
+                        Expires {new Date(coupon.end_at).toLocaleDateString()}
+                        {coupon.coupon_code ? ` | Code: ${coupon.coupon_code}` : ''}
+                      </p>
+                    </div>
+                    <div className="admin-coupon-actions">
+                      <button
+                        type="button"
+                        className="admin-edit-btn"
+                        onClick={() => handleEditCoupon(coupon)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() => handleDeleteCoupon(coupon.id)}
+                        disabled={deletingCouponId === coupon.id}
+                      >
+                        {deletingCouponId === coupon.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </main>
       </div>
     )
@@ -258,8 +375,6 @@ function App() {
 
         <div className="hero-content">
           <div>
-            {/* <p className="eyebrow">Trusted Canadian coupon hub</p>
-            <h1>Save on top brands with verified promo codes</h1> */}
             <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
           </div>
         </div>
@@ -294,7 +409,7 @@ function App() {
         <div className="footer-grid">
           <div>
             <h3>Retail Flipp</h3>
-            <p>Canada's best coupon finder for verified codes, deals, and savings.</p>
+            <p>Canada&apos;s best coupon finder for verified codes, deals, and savings.</p>
           </div>
           <div>
             <h4>Shop</h4>
@@ -316,7 +431,7 @@ function App() {
           </div>
         </div>
         <div className="footer-bar">
-          <p>© 2026 Retail Flipp. All rights reserved.</p>
+          <p>Copyright 2026 Retail Flipp. All rights reserved.</p>
           <div className="social-links">
             <a href="#">Facebook</a>
             <a href="#">Instagram</a>

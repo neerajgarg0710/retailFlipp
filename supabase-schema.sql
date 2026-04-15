@@ -98,6 +98,11 @@ CREATE TABLE coupon_stats (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure editorial coupon flags keep sensible defaults
+ALTER TABLE coupons
+  ALTER COLUMN is_verified SET DEFAULT FALSE,
+  ALTER COLUMN is_exclusive SET DEFAULT FALSE;
+
 CREATE POLICY "Public can view logos"
 ON storage.objects FOR SELECT
 TO public
