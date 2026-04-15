@@ -1,4 +1,4 @@
--- Supabase schema for Retail Flipp
+-- Supabase schema for Smart Coupon Club
 
 -- Drop dependent objects first so the file can be rerun safely
 DROP TABLE IF EXISTS coupon_stats;

@@ -1,4 +1,4 @@
-# Retail Flipp
+# Smart Coupon Club
 
 This is a React application built with Vite for displaying coupons, similar to RetailMeNot.
 

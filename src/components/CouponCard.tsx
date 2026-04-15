@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react'
 import type { Coupon } from '../types'
 
 interface CouponCardProps {
@@ -17,6 +17,8 @@ export default function CouponCard({ coupon }: CouponCardProps) {
   const discountLabel = formatDiscount(coupon.discount_type)
   const storeName = coupon.stores?.name ?? 'Unknown store'
   const logoUrl = coupon.stores?.logo_url
+  const affiliateUrl = coupon.url?.trim() ?? ''
+  const hasAffiliateUrl = affiliateUrl.length > 0
   const fallbackInitial = storeName.charAt(0).toUpperCase()
   const valueLabel = coupon.discount_value ? `${coupon.discount_value} ${discountLabel}` : discountLabel
   const hasCouponCode = Boolean(coupon.coupon_code)
@@ -53,8 +55,39 @@ export default function CouponCard({ coupon }: CouponCardProps) {
     }
   }
 
+  const handleOpenAffiliateLink = () => {
+    if (!hasAffiliateUrl) {
+      return
+    }
+
+    window.open(affiliateUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!hasAffiliateUrl) {
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleOpenAffiliateLink()
+    }
+  }
+
+  const handleCodeButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    void handleCopyCode()
+  }
+
   return (
-    <div className={`coupon-card ${isExpired ? 'coupon-card-expired' : ''}`}>
+    <div
+      className={`coupon-card ${isExpired ? 'coupon-card-expired' : ''} ${hasAffiliateUrl ? 'coupon-card-linkable' : ''}`}
+      onClick={handleOpenAffiliateLink}
+      onKeyDown={handleCardKeyDown}
+      role={hasAffiliateUrl ? 'link' : undefined}
+      tabIndex={hasAffiliateUrl ? 0 : undefined}
+      aria-label={hasAffiliateUrl ? `Open offer for ${storeName} in a new tab` : undefined}
+    >
       <div className="coupon-card-hero">
         <span className="coupon-badge">{valueLabel}</span>
         <div className="coupon-logo-shell">
@@ -76,7 +109,7 @@ export default function CouponCard({ coupon }: CouponCardProps) {
         <button
           className={`coupon-code-pill ${hasCouponCode ? 'copyable' : 'static'}`}
           type="button"
-          onClick={handleCopyCode}
+          onClick={handleCodeButtonClick}
           disabled={!hasCouponCode}
         >
           {codeLabel}

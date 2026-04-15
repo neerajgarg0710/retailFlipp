@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import './App.css'
 import { supabase } from './shared/supabaseClient'
@@ -26,9 +26,9 @@ const initialCouponState: NewCoupon = {
 
 const faqItems = [
   {
-    question: 'How can Retail Flipp help me save money when shopping online?',
+    question: 'How can Smart Coupon Club help me save money when shopping online?',
     answer:
-      'Retail Flipp brings together active coupon codes, limited-time deals, and store offers in one place so you can compare savings quickly before you check out.'
+      'Smart Coupon Club brings together active coupon codes, limited-time deals, and store offers in one place so you can compare savings quickly before you check out.'
   },
   {
     question: 'How often are coupons and promo codes updated?',
@@ -36,7 +36,7 @@ const faqItems = [
       'Offers are refreshed as new coupons are added, and expiring deals are sorted by end date so current savings are easier to spot.'
   },
   {
-    question: 'Can I use Retail Flipp on mobile while shopping in store?',
+    question: 'Can I use Smart Coupon Club on mobile while shopping in store?',
     answer:
       'Yes. You can search for deals from your phone and check for savings before you buy online or while comparing prices in store.'
   }
@@ -103,6 +103,7 @@ function App() {
   const [newCoupon, setNewCoupon] = useState<NewCoupon>(initialCouponState)
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
+  const filterMenuContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     fetchCoupons()
@@ -120,6 +121,28 @@ function App() {
       }
     }
   }, [location.pathname, isLoggedIn])
+
+  useEffect(() => {
+    if (!openFilterMenu) {
+      return
+    }
+
+    const handlePointerDownOutsideMenu = (event: PointerEvent) => {
+      const menuContainer = filterMenuContainerRef.current
+      const eventTarget = event.target
+
+      if (!menuContainer || !(eventTarget instanceof Node)) {
+        return
+      }
+
+      if (!menuContainer.contains(eventTarget)) {
+        setOpenFilterMenu(null)
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDownOutsideMenu)
+    return () => window.removeEventListener('pointerdown', handlePointerDownOutsideMenu)
+  }, [openFilterMenu])
 
   const fetchCoupons = async () => {
     const nowIso = new Date().toISOString()
@@ -188,7 +211,8 @@ function App() {
     const uniqueCategories = new Map<string, Category>()
 
     coupons.forEach((coupon) => {
-      ;(coupon.coupon_categories ?? []).forEach((link) => {
+      const couponCategories = coupon.coupon_categories ?? []
+      couponCategories.forEach((link) => {
         const category = link.categories
         if (category?.id && !uniqueCategories.has(category.id)) {
           uniqueCategories.set(category.id, category)
@@ -449,7 +473,7 @@ function App() {
     return (
       <div className="app">
         <header>
-          <h1>Retail Flipp - Admin</h1>
+          <h1>Smart Coupon Club - Admin</h1>
           <Link to="/" className="admin-btn">Back to Main</Link>
         </header>
         <main>
@@ -514,13 +538,13 @@ function App() {
       <header className="hero-header">
         <div className="top-panel">
           <div className="brand-line">
-            <span className="brand-mark">Retail</span>
-            <span className="brand-name">Flipp</span>
+            <span className="brand-mark">Smart Coupon</span>
+            <span className="brand-name">Club</span>
           </div>
           <div className="top-panel-search">
             <SearchBar value={searchTerm} onChange={setSearchTerm} />
           </div>
-          <div className="top-panel-links">
+          <div className="top-panel-links" ref={filterMenuContainerRef}>
             <div className="header-filter-dropdown">
               <button
                 type="button"
@@ -622,13 +646,6 @@ function App() {
             >
               Expiring Soon
             </button>
-            <button
-              type="button"
-              className={`browse-chip ${sortOption === 'best-discount' ? 'active' : ''}`}
-              onClick={() => setSortOption('best-discount')}
-            >
-              Best Discount
-            </button>
           </div>
           <button
             type="button"
@@ -675,7 +692,7 @@ function App() {
               ))}
             </div>
             <p className="faq-note">
-              Retail Flipp helps shoppers discover coupon codes, featured offers, and everyday savings across popular brands and retailers.
+              Smart Coupon Club helps shoppers discover coupon codes, featured offers, and everyday savings across popular brands and retailers.
             </p>
           </div>
         </section>
@@ -684,7 +701,7 @@ function App() {
       <footer className="site-footer">
         <div className="footer-grid">
           <div>
-            <h3>Retail Flipp</h3>
+            <h3>Smart Coupon Club</h3>
             <p>Canada&apos;s best coupon finder for verified codes, deals, and savings.</p>
           </div>
           <div>
@@ -707,7 +724,7 @@ function App() {
           </div>
         </div>
         <div className="footer-bar">
-          <p>Copyright 2026 Retail Flipp. All rights reserved.</p>
+          <p>Copyright 2026 Smart Coupon Club. All rights reserved.</p>
           <div className="social-links">
             <a href="#">Facebook</a>
             <a href="#">Instagram</a>

@@ -1,7 +1,7 @@
 - [x] Verify that the copilot-instructions.md file in the .github directory is created.
 
 - [x] Clarify Project Requirements
-	Project type: React app named retailFlipp with landing page, coupons display, search functionality, mock data inspired by retailmenot.com/ca.
+	Project type: React app named Smart Coupon Club with landing page, coupons display, search functionality, mock data inspired by retailmenot.com/ca.
 
 - [x] Scaffold the Project
 	Used Vite to create React TypeScript project structure.
