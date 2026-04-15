@@ -21,6 +21,24 @@ const initialCouponState: NewCoupon = {
   endAt: ''
 }
 
+const faqItems = [
+  {
+    question: 'How can Retail Flipp help me save money when shopping online?',
+    answer:
+      'Retail Flipp brings together active coupon codes, limited-time deals, and store offers in one place so you can compare savings quickly before you check out.'
+  },
+  {
+    question: 'How often are coupons and promo codes updated?',
+    answer:
+      'Offers are refreshed as new coupons are added, and expiring deals are sorted by end date so current savings are easier to spot.'
+  },
+  {
+    question: 'Can I use Retail Flipp on mobile while shopping in store?',
+    answer:
+      'Yes. You can search for deals from your phone and check for savings before you buy online or while comparing prices in store.'
+  }
+]
+
 const sanitizeStoreSlug = (storeName: string) =>
   storeName
     .trim()
@@ -240,8 +258,8 @@ function App() {
 
         <div className="hero-content">
           <div>
-            <p className="eyebrow">Trusted Canadian coupon hub</p>
-            <h1>Save on top brands with verified promo codes</h1>
+            {/* <p className="eyebrow">Trusted Canadian coupon hub</p>
+            <h1>Save on top brands with verified promo codes</h1> */}
             <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
           </div>
         </div>
@@ -252,6 +270,23 @@ function App() {
           {filteredCoupons.map((coupon) => (
             <CouponCard key={coupon.id} coupon={coupon} />
           ))}
+        </section>
+
+        <section className="faq-section" aria-labelledby="faq-heading">
+          <div className="faq-shell">
+            <h2 id="faq-heading">Frequently Asked Questions</h2>
+            <div className="faq-list">
+              {faqItems.map((item, index) => (
+                <details key={item.question} className="faq-item" open={index === 0}>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+            <p className="faq-note">
+              Retail Flipp helps shoppers discover coupon codes, featured offers, and everyday savings across popular brands and retailers.
+            </p>
+          </div>
         </section>
       </main>
 
