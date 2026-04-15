@@ -1,13 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import './App.css'
-import { supabase } from './supabaseClient'
+import { supabase } from './shared/supabaseClient'
+import { ADMIN_PASSWORD } from './shared/constants'
 import type { Coupon, NewCoupon } from './types'
 import AdminPanel from './components/AdminPanel'
 import CouponCard from './components/CouponCard'
 import SearchBar from './components/SearchBar'
-
-const ADMIN_PASSWORD = 'admin123'
 
 const initialCouponState: NewCoupon = {
   title: '',
