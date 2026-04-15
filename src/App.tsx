@@ -1,9 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import './App.css'
 import { supabase } from './shared/supabaseClient'
 import { ADMIN_PASSWORD } from './shared/constants'
-import type { Coupon, NewCoupon } from './types'
+import type { Category, Coupon, NewCoupon, Store } from './types'
 import AdminPanel from './components/AdminPanel'
 import CouponCard from './components/CouponCard'
 import SearchBar from './components/SearchBar'
@@ -20,7 +20,8 @@ const initialCouponState: NewCoupon = {
   url: '',
   endAt: '',
   isVerified: false,
-  isExclusive: false
+  isExclusive: false,
+  categoryIds: []
 }
 
 const faqItems = [
@@ -55,17 +56,9 @@ const getFileExtension = (file: File) => {
     return fileNameExtension
   }
 
-  if (file.type === 'image/png') {
-    return 'png'
-  }
-
-  if (file.type === 'image/jpeg') {
-    return 'jpg'
-  }
-
-  if (file.type === 'image/webp') {
-    return 'webp'
-  }
+  if (file.type === 'image/png') return 'png'
+  if (file.type === 'image/jpeg') return 'jpg'
+  if (file.type === 'image/webp') return 'webp'
 
   return 'png'
 }
@@ -73,7 +66,11 @@ const getFileExtension = (file: File) => {
 function App() {
   const location = useLocation()
   const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedStoreSlug, setSelectedStoreSlug] = useState<string | null>(null)
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null)
+  const [openFilterMenu, setOpenFilterMenu] = useState<'stores' | 'categories' | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [newCoupon, setNewCoupon] = useState<NewCoupon>(initialCouponState)
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
@@ -81,6 +78,7 @@ function App() {
 
   useEffect(() => {
     fetchCoupons()
+    fetchCategories()
   }, [])
 
   useEffect(() => {
@@ -97,8 +95,8 @@ function App() {
 
   const fetchCoupons = async () => {
     const { data, error } = await supabase
-      .from<Coupon>('coupons')
-      .select('*, stores(name, logo_url)')
+      .from('coupons')
+      .select('*, stores(id, name, slug, logo_url), coupon_categories(categories(id, name, slug))')
       .order('end_at', { ascending: true })
 
     if (error) {
@@ -106,11 +104,62 @@ function App() {
       return
     }
 
-    setCoupons(data ?? [])
+    setCoupons((data as Coupon[]) ?? [])
   }
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name, slug')
+      .order('name', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching categories:', error)
+      return
+    }
+
+    setCategories((data as Category[]) ?? [])
+  }
+
+  const stores = useMemo<Store[]>(() => {
+    const uniqueStores = new Map<string, Store>()
+
+    coupons.forEach((coupon) => {
+      const store = coupon.stores
+      if (store?.id && !uniqueStores.has(store.id)) {
+        uniqueStores.set(store.id, store)
+      }
+    })
+
+    return [...uniqueStores.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [coupons])
+
+  const visibleCategories = useMemo<Category[]>(() => {
+    const uniqueCategories = new Map<string, Category>()
+
+    coupons.forEach((coupon) => {
+      ;(coupon.coupon_categories ?? []).forEach((link) => {
+        const category = link.categories
+        if (category?.id && !uniqueCategories.has(category.id)) {
+          uniqueCategories.set(category.id, category)
+        }
+      })
+    })
+
+    return [...uniqueCategories.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [coupons])
 
   const handleFieldChange = (field: keyof NewCoupon, value: string | boolean | File | null) => {
     setNewCoupon((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleCategoryToggle = (categoryId: string) => {
+    setNewCoupon((current) => ({
+      ...current,
+      categoryIds: current.categoryIds.includes(categoryId)
+        ? current.categoryIds.filter((id) => id !== categoryId)
+        : [...current.categoryIds, categoryId]
+    }))
   }
 
   const resetCouponForm = () => {
@@ -185,6 +234,26 @@ function App() {
     return insertedStore.id
   }
 
+  const syncCouponCategories = async (couponId: string, categoryIds: string[]) => {
+    const { error: deleteError } = await supabase.from('coupon_categories').delete().eq('coupon_id', couponId)
+
+    if (deleteError) {
+      throw deleteError
+    }
+
+    if (categoryIds.length === 0) {
+      return
+    }
+
+    const { error: insertError } = await supabase
+      .from('coupon_categories')
+      .insert(categoryIds.map((categoryId) => ({ coupon_id: couponId, category_id: categoryId })))
+
+    if (insertError) {
+      throw insertError
+    }
+  }
+
   const handleSaveCoupon = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -203,19 +272,26 @@ function App() {
         is_exclusive: newCoupon.isExclusive
       }
 
-      const { error } = editingCouponId
-        ? await supabase.from('coupons').update(payload).eq('id', editingCouponId)
-        : await supabase.from('coupons').insert([
-            {
-              ...payload,
-              status: 'ACTIVE'
-            }
-          ])
+      if (editingCouponId) {
+        const { error } = await supabase.from('coupons').update(payload).eq('id', editingCouponId)
 
-      if (error) {
-        console.error('Error saving coupon:', error)
-        alert('Error saving coupon')
-        return
+        if (error) {
+          throw error
+        }
+
+        await syncCouponCategories(editingCouponId, newCoupon.categoryIds)
+      } else {
+        const { data, error } = await supabase
+          .from('coupons')
+          .insert([{ ...payload, status: 'ACTIVE' }])
+          .select('id')
+          .single()
+
+        if (error || !data) {
+          throw error ?? new Error('Unable to create coupon.')
+        }
+
+        await syncCouponCategories(data.id as string, newCoupon.categoryIds)
       }
 
       alert(editingCouponId ? 'Coupon updated successfully' : 'Coupon added successfully')
@@ -242,7 +318,8 @@ function App() {
       url: coupon.url ?? '',
       endAt: coupon.end_at.slice(0, 10),
       isVerified: coupon.is_verified,
-      isExclusive: coupon.is_exclusive
+      isExclusive: coupon.is_exclusive,
+      categoryIds: coupon.coupon_categories?.flatMap((link) => (link.categories?.id ? [link.categories.id] : [])) ?? []
     })
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -279,10 +356,16 @@ function App() {
 
   const filteredCoupons = coupons.filter((coupon) => {
     const lowerSearch = searchTerm.toLowerCase()
-    return (
+    const storeMatch = selectedStoreSlug ? coupon.stores?.slug === selectedStoreSlug : true
+    const categoryMatch = selectedCategorySlug
+      ? (coupon.coupon_categories ?? []).some((link) => link.categories?.slug === selectedCategorySlug)
+      : true
+    const searchMatch =
       coupon.title.toLowerCase().includes(lowerSearch) ||
-      coupon.stores?.name.toLowerCase().includes(lowerSearch)
-    )
+      coupon.stores?.name.toLowerCase().includes(lowerSearch) ||
+      (coupon.coupon_categories ?? []).some((link) => link.categories?.name.toLowerCase().includes(lowerSearch))
+
+    return storeMatch && categoryMatch && searchMatch
   })
 
   if (location.pathname === '/admin') {
@@ -299,8 +382,10 @@ function App() {
         <main>
           <AdminPanel
             coupon={newCoupon}
+            categories={categories}
             isEditing={editingCouponId !== null}
             onChange={handleFieldChange}
+            onCategoryToggle={handleCategoryToggle}
             onCancelEdit={resetCouponForm}
             onFileChange={(file) => handleFieldChange('logoFile', file)}
             onSubmit={handleSaveCoupon}
@@ -329,11 +414,7 @@ function App() {
                       </p>
                     </div>
                     <div className="admin-coupon-actions">
-                      <button
-                        type="button"
-                        className="admin-edit-btn"
-                        onClick={() => handleEditCoupon(coupon)}
-                      >
+                      <button type="button" className="admin-edit-btn" onClick={() => handleEditCoupon(coupon)}>
                         Edit
                       </button>
                       <button
@@ -367,20 +448,96 @@ function App() {
             <SearchBar value={searchTerm} onChange={setSearchTerm} />
           </div>
           <div className="top-panel-links">
-            <a href="#stores">Stores</a>
-            <a href="#categories">Categories</a>
-            <a href="#deals">Deals</a>
+            <div className="header-filter-dropdown">
+              <button
+                type="button"
+                className="header-filter-trigger"
+                onClick={() => setOpenFilterMenu((current) => (current === 'stores' ? null : 'stores'))}
+              >
+                Stores
+              </button>
+              {openFilterMenu === 'stores' && (
+                <div className="header-filter-menu">
+                  <button type="button" className="header-filter-option" onClick={() => {
+                    setSelectedStoreSlug(null)
+                    setOpenFilterMenu(null)
+                  }}>
+                    All Stores
+                  </button>
+                  {stores.map((store) => (
+                    <button
+                      key={store.id}
+                      type="button"
+                      className="header-filter-option"
+                      onClick={() => {
+                        setSelectedStoreSlug(store.slug ?? null)
+                        setOpenFilterMenu(null)
+                      }}
+                    >
+                      {store.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="header-filter-dropdown">
+              <button
+                type="button"
+                className="header-filter-trigger"
+                onClick={() => setOpenFilterMenu((current) => (current === 'categories' ? null : 'categories'))}
+              >
+                Categories
+              </button>
+              {openFilterMenu === 'categories' && (
+                <div className="header-filter-menu">
+                  <button type="button" className="header-filter-option" onClick={() => {
+                    setSelectedCategorySlug(null)
+                    setOpenFilterMenu(null)
+                  }}>
+                    All Categories
+                  </button>
+                  {visibleCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      className="header-filter-option"
+                      onClick={() => {
+                        setSelectedCategorySlug(category.slug)
+                        setOpenFilterMenu(null)
+                      }}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="hero-content">
           <div>
+            <p className="eyebrow">Trusted Canadian coupon hub</p>
+            {/* <h4>Save on top brands with verified promo codes</h4> */}
             <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
           </div>
         </div>
       </header>
 
       <main>
+        <section className="active-filters">
+          {selectedStoreSlug && (
+            <button type="button" className="active-filter-chip" onClick={() => setSelectedStoreSlug(null)}>
+              Store: {stores.find((store) => store.slug === selectedStoreSlug)?.name} ×
+            </button>
+          )}
+          {selectedCategorySlug && (
+            <button type="button" className="active-filter-chip" onClick={() => setSelectedCategorySlug(null)}>
+              Category: {visibleCategories.find((category) => category.slug === selectedCategorySlug)?.name ?? categories.find((category) => category.slug === selectedCategorySlug)?.name} ×
+            </button>
+          )}
+        </section>
+
         <section className="coupons-grid" id="deals">
           {filteredCoupons.map((coupon) => (
             <CouponCard key={coupon.id} coupon={coupon} />

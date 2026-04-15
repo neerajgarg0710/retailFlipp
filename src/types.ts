@@ -4,7 +4,18 @@ export type CouponStatus = 'ACTIVE' | 'EXPIRED' | 'DISABLED'
 export interface Store {
   id: string
   name: string
+  slug?: string
   logo_url?: string | null
+}
+
+export interface Category {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface CouponCategoryLink {
+  categories?: Category | null
 }
 
 export interface Coupon {
@@ -22,6 +33,7 @@ export interface Coupon {
   created_at: string | null
   updated_at: string | null
   stores?: Store | null
+  coupon_categories?: CouponCategoryLink[] | null
 }
 
 export interface NewCoupon {
@@ -37,4 +49,5 @@ export interface NewCoupon {
   endAt: string
   isVerified: boolean
   isExclusive: boolean
+  categoryIds: string[]
 }

@@ -1,1 +1,1 @@
-export const ADMIN_PASSWORD = 'retailFlippCanada'
+export const ADMIN_PASSWORD = 'admin123'

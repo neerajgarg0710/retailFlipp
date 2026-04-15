@@ -1,10 +1,12 @@
 import type { FormEvent, ChangeEvent } from 'react'
-import type { NewCoupon, DiscountType } from '../types'
+import type { NewCoupon, DiscountType, Category } from '../types'
 
 interface AdminPanelProps {
   coupon: NewCoupon
+  categories: Category[]
   isEditing: boolean
   onChange: (field: keyof NewCoupon, value: string | boolean | File | null) => void
+  onCategoryToggle: (categoryId: string) => void
   onCancelEdit: () => void
   onFileChange: (file: File | null) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -12,7 +14,16 @@ interface AdminPanelProps {
 
 const discountTypes: DiscountType[] = ['PERCENT', 'FIXED', 'FREE_SHIPPING', 'CASHBACK']
 
-export default function AdminPanel({ coupon, isEditing, onChange, onCancelEdit, onFileChange, onSubmit }: AdminPanelProps) {
+export default function AdminPanel({
+  coupon,
+  categories,
+  isEditing,
+  onChange,
+  onCategoryToggle,
+  onCancelEdit,
+  onFileChange,
+  onSubmit
+}: AdminPanelProps) {
   return (
     <div className="admin-panel">
       <div className="admin-form-header">
@@ -106,6 +117,25 @@ export default function AdminPanel({ coupon, isEditing, onChange, onCancelEdit, 
           />
           Exclusive offer
         </label>
+        <div className="admin-category-picker">
+          <span className="admin-category-label">Categories</span>
+          <div className="admin-category-options">
+            {categories.length === 0 ? (
+              <p className="admin-category-empty">No categories found. Add category rows in Supabase first.</p>
+            ) : (
+              categories.map((category) => (
+                <label key={category.id} className="admin-checkbox admin-checkbox-compact">
+                  <input
+                    type="checkbox"
+                    checked={coupon.categoryIds.includes(category.id)}
+                    onChange={() => onCategoryToggle(category.id)}
+                  />
+                  {category.name}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
         <input
           type="date"
           value={coupon.endAt}

@@ -98,6 +98,15 @@ CREATE TABLE coupon_stats (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+INSERT INTO categories (name, slug)
+VALUES
+  ('Fashion', 'fashion'),
+  ('Electronics', 'electronics'),
+  ('Travel', 'travel'),
+  ('Food Delivery', 'food-delivery'),
+  ('Home & Garden', 'home-garden'),
+  ('Beauty', 'beauty');
+
 -- Ensure editorial coupon flags keep sensible defaults
 ALTER TABLE coupons
   ALTER COLUMN is_verified SET DEFAULT FALSE,
