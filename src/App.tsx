@@ -157,7 +157,6 @@ function App() {
         <h1>Retail Flipp</h1>
         <p>Find the best coupons and deals</p>
         <SearchBar value={searchTerm} onChange={setSearchTerm} />
-        <Link to="/admin" className="admin-btn">Admin</Link>
       </header>
       <main>
         <div className="coupons-grid">
