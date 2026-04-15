@@ -1,19 +1,66 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
+import { supabase } from './supabaseClient'
 
-const mockCoupons = [
-  { id: 1, title: '20% Off Electronics', store: 'Best Buy', discount: '20%', code: 'BEST20', description: 'Save on all electronics', expiry: '2024-12-31' },
-  { id: 2, title: 'Free Shipping', store: 'Amazon', discount: 'Free Shipping', code: 'SHIPFREE', description: 'Free shipping on orders over $25', expiry: '2024-11-30' },
-  { id: 3, title: '15% Off Clothing', store: 'H&M', discount: '15%', code: 'HM15', description: 'Discount on all clothing items', expiry: '2024-10-31' },
-  { id: 4, title: 'Buy One Get One', store: 'Starbucks', discount: 'BOGO', code: 'STARBOGO', description: 'Buy one coffee get one free', expiry: '2024-09-30' },
-  { id: 5, title: '30% Off Home Goods', store: 'IKEA', discount: '30%', code: 'IKEA30', description: 'Save on furniture and decor', expiry: '2024-12-15' },
-  // Add more as needed
-]
+const ADMIN_PASSWORD = 'admin123' // Change this to your desired password
 
 function App() {
+  const [coupons, setCoupons] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [newCoupon, setNewCoupon] = useState({
+    title: '',
+    store: '',
+    discount: '',
+    code: '',
+    description: '',
+    expiry: ''
+  })
 
-  const filteredCoupons = mockCoupons.filter(coupon =>
+  useEffect(() => {
+    fetchCoupons()
+  }, [])
+
+  const fetchCoupons = async () => {
+    const { data, error } = await supabase
+      .from('coupons')
+      .select('*')
+    if (error) console.error('Error fetching coupons:', error)
+    else setCoupons(data || [])
+  }
+
+  const handleAdminLogin = () => {
+    const password = prompt('Enter admin password:')
+    if (password === ADMIN_PASSWORD) {
+      setIsAdmin(true)
+    } else {
+      alert('Incorrect password')
+    }
+  }
+
+  const handleAddCoupon = async (e) => {
+    e.preventDefault()
+    const { error } = await supabase
+      .from('coupons')
+      .insert([newCoupon])
+    if (error) {
+      console.error('Error adding coupon:', error)
+      alert('Error adding coupon')
+    } else {
+      alert('Coupon added successfully')
+      setNewCoupon({
+        title: '',
+        store: '',
+        discount: '',
+        code: '',
+        description: '',
+        expiry: ''
+      })
+      fetchCoupons() // Refresh the list
+    }
+  }
+
+  const filteredCoupons = coupons.filter(coupon =>
     coupon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     coupon.store.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -30,8 +77,59 @@ function App() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-bar"
         />
+        {!isAdmin && (
+          <button onClick={handleAdminLogin} className="admin-btn">Admin Login</button>
+        )}
       </header>
       <main>
+        {isAdmin && (
+          <div className="admin-panel">
+            <h2>Add New Coupon</h2>
+            <form onSubmit={handleAddCoupon} className="coupon-form">
+              <input
+                type="text"
+                placeholder="Title"
+                value={newCoupon.title}
+                onChange={(e) => setNewCoupon({ ...newCoupon, title: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Store"
+                value={newCoupon.store}
+                onChange={(e) => setNewCoupon({ ...newCoupon, store: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Discount"
+                value={newCoupon.discount}
+                onChange={(e) => setNewCoupon({ ...newCoupon, discount: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Code"
+                value={newCoupon.code}
+                onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value })}
+                required
+              />
+              <textarea
+                placeholder="Description"
+                value={newCoupon.description}
+                onChange={(e) => setNewCoupon({ ...newCoupon, description: e.target.value })}
+                required
+              />
+              <input
+                type="date"
+                value={newCoupon.expiry}
+                onChange={(e) => setNewCoupon({ ...newCoupon, expiry: e.target.value })}
+                required
+              />
+              <button type="submit">Add Coupon</button>
+            </form>
+          </div>
+        )}
         <div className="coupons-grid">
           {filteredCoupons.map(coupon => (
             <div key={coupon.id} className="coupon-card">
