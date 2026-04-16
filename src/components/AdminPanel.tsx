@@ -1,12 +1,12 @@
-import type { FormEvent, ChangeEvent } from 'react'
-import type { NewCoupon, DiscountType, Category } from '../types'
+import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import type { Category, DiscountType, NewCoupon } from '../types'
 
 interface AdminPanelProps {
   coupon: NewCoupon
   categories: Category[]
   isEditing: boolean
   onChange: (field: keyof NewCoupon, value: string | boolean | File | null) => void
-  onCategoryToggle: (categoryId: string) => void
+  onCategoryChange: (categoryIds: string[]) => void
   onCancelEdit: () => void
   onFileChange: (file: File | null) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -19,16 +19,47 @@ export default function AdminPanel({
   categories,
   isEditing,
   onChange,
-  onCategoryToggle,
+  onCategoryChange,
   onCancelEdit,
   onFileChange,
   onSubmit
 }: AdminPanelProps) {
+  const [availableSelection, setAvailableSelection] = useState<string[]>([])
+  const [selectedSelection, setSelectedSelection] = useState<string[]>([])
+
+  const availableCategories = useMemo(
+    () => categories.filter((category) => !coupon.categoryIds.includes(category.id)),
+    [categories, coupon.categoryIds]
+  )
+
+  const selectedCategories = useMemo(
+    () => categories.filter((category) => coupon.categoryIds.includes(category.id)),
+    [categories, coupon.categoryIds]
+  )
+
+  const handleAddCategories = () => {
+    if (availableSelection.length === 0) {
+      return
+    }
+
+    onCategoryChange([...coupon.categoryIds, ...availableSelection])
+    setAvailableSelection([])
+  }
+
+  const handleRemoveCategories = () => {
+    if (selectedSelection.length === 0) {
+      return
+    }
+
+    onCategoryChange(coupon.categoryIds.filter((categoryId) => !selectedSelection.includes(categoryId)))
+    setSelectedSelection([])
+  }
+
   return (
     <div className="admin-panel">
       <div className="admin-form-header">
         <div>
-          <h2>{isEditing ? 'Edit Coupon' : 'Add New Coupon'}</h2>
+          <h2 id="admin-coupon-modal-title">{isEditing ? 'Edit Coupon' : 'Add New Coupon'}</h2>
           <p>{isEditing ? 'Update the selected coupon and save the changes.' : 'Create a new coupon and publish it to the live list.'}</p>
         </div>
         {isEditing && (
@@ -95,6 +126,14 @@ export default function AdminPanel({
           value={coupon.url}
           onChange={(e) => onChange('url', e.target.value)}
         />
+        <input
+          type="number"
+          min="1"
+          step="1"
+          placeholder="Rank (1 = highest priority)"
+          value={coupon.rank}
+          onChange={(e) => onChange('rank', e.target.value)}
+        />
         <textarea
           placeholder="Description"
           value={coupon.description}
@@ -117,30 +156,77 @@ export default function AdminPanel({
           />
           Exclusive offer
         </label>
+        <label className="admin-checkbox">
+          <input
+            type="checkbox"
+            checked={coupon.isLimitedTime}
+            onChange={(e) => onChange('isLimitedTime', e.target.checked)}
+          />
+          Limited Time
+        </label>
         <div className="admin-category-picker">
           <span className="admin-category-label">Categories</span>
-          <div className="admin-category-options">
-            {categories.length === 0 ? (
-              <p className="admin-category-empty">No categories found. Add category rows in Supabase first.</p>
-            ) : (
-              categories.map((category) => (
-                <label key={category.id} className="admin-checkbox admin-checkbox-compact">
-                  <input
-                    type="checkbox"
-                    checked={coupon.categoryIds.includes(category.id)}
-                    onChange={() => onCategoryToggle(category.id)}
-                  />
-                  {category.name}
-                </label>
-              ))
-            )}
-          </div>
+          {categories.length === 0 ? (
+            <p className="admin-category-empty">No categories found. Add category rows in Supabase first.</p>
+          ) : (
+            <div className="admin-category-transfer">
+              <div className="admin-category-column">
+                <span className="admin-category-subtitle">Available</span>
+                <select
+                  className="admin-category-select"
+                  multiple
+                  value={availableSelection}
+                  onChange={(e) => setAvailableSelection(Array.from(e.target.selectedOptions, (option) => option.value))}
+                >
+                  {availableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="admin-category-transfer-actions">
+                <button
+                  type="button"
+                  className="admin-transfer-btn"
+                  onClick={handleAddCategories}
+                  disabled={availableSelection.length === 0}
+                >
+                  Add to Selected
+                </button>
+                <button
+                  type="button"
+                  className="admin-transfer-btn"
+                  onClick={handleRemoveCategories}
+                  disabled={selectedSelection.length === 0}
+                >
+                  Remove from Selected
+                </button>
+              </div>
+
+              <div className="admin-category-column">
+                <span className="admin-category-subtitle">Selected</span>
+                <select
+                  className="admin-category-select"
+                  multiple
+                  value={selectedSelection}
+                  onChange={(e) => setSelectedSelection(Array.from(e.target.selectedOptions, (option) => option.value))}
+                >
+                  {selectedCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
         <input
           type="date"
           value={coupon.endAt}
           onChange={(e) => onChange('endAt', e.target.value)}
-          required
         />
         <button type="submit">{isEditing ? 'Update Coupon' : 'Add Coupon'}</button>
       </form>

@@ -523,6 +523,11 @@
   color: #6c38c6;
 }
 
+.coupon-tag.limited-time {
+  background: #fff0e1;
+  color: #b25b05;
+}
+
 .coupon-tag.expired {
   background: #f3e8e8;
   color: #9a4545;
@@ -612,6 +617,12 @@
   color: #6e5a89;
 }
 
+.admin-list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .admin-count {
   padding: 6px 12px;
   border-radius: 999px;
@@ -619,6 +630,21 @@
   color: #6b22a2;
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.admin-add-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7b22b3 0%, #8d33c3 100%);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(123, 34, 179, 0.2);
+}
+
+.admin-add-btn:hover {
+  filter: brightness(1.03);
 }
 
 .admin-list-items {
@@ -741,10 +767,6 @@
   margin: 0;
 }
 
-.admin-checkbox-compact {
-  padding: 10px 12px;
-}
-
 .admin-category-picker {
   grid-column: span 2;
   display: flex;
@@ -757,15 +779,89 @@
   font-weight: 700;
 }
 
-.admin-category-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .admin-category-empty {
   margin: 0;
   color: #6e5a89;
+}
+
+.admin-category-transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.admin-category-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-category-subtitle {
+  color: #6e5a89;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-category-select {
+  min-height: 132px;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #fff;
+  color: #44255f;
+}
+
+.admin-category-select option {
+  padding: 6px 8px;
+}
+
+.admin-category-transfer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-transfer-btn {
+  padding: 10px 14px;
+  border: 1px solid #d6c0eb;
+  border-radius: 10px;
+  background: #f7efff;
+  color: #5f2d89;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-transfer-btn:hover:not(:disabled) {
+  background: #f0e4ff;
+}
+
+.admin-transfer-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 16px;
+  background: rgba(34, 14, 53, 0.6);
+  overflow-y: auto;
+}
+
+.admin-modal {
+  width: min(920px, 100%);
+}
+
+.admin-modal .admin-panel {
+  margin-bottom: 0;
+  border-color: #e3d4f2;
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(39, 12, 63, 0.22);
 }
 
 .coupon-form textarea {
@@ -773,7 +869,7 @@
   resize: vertical;
 }
 
-.coupon-form button {
+.coupon-form > button {
   grid-column: span 2;
   padding: 14px;
   border: none;
@@ -784,7 +880,7 @@
   cursor: pointer;
 }
 
-.coupon-form button:hover {
+.coupon-form > button:hover {
   background-color: #681d97;
 }
 
@@ -927,13 +1023,23 @@
     grid-column: span 1;
   }
 
-  .admin-category-options {
+  .admin-category-transfer {
     grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-category-transfer-actions {
+    flex-direction: row;
   }
 
   .coupon-form textarea,
-  .coupon-form button {
+  .coupon-form > button {
     grid-column: span 1;
+  }
+
+  .admin-list-header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .admin-coupon-item {

@@ -19,8 +19,10 @@ const initialCouponState: NewCoupon = {
   description: '',
   url: '',
   endAt: '',
+  rank: '',
   isVerified: false,
   isExclusive: false,
+  isLimitedTime: false,
   categoryIds: []
 }
 
@@ -64,7 +66,10 @@ const getFileExtension = (file: File) => {
 }
 
 const isCouponExpired = (coupon: Pick<Coupon, 'end_at' | 'status'>) =>
-  coupon.status === 'EXPIRED' || new Date(coupon.end_at).getTime() < Date.now()
+  coupon.status === 'EXPIRED' || (coupon.end_at ? new Date(coupon.end_at).getTime() < Date.now() : false)
+
+const getCouponRankValue = (coupon: Pick<Coupon, 'rank'>) => coupon.rank ?? Number.MAX_SAFE_INTEGER
+const getCouponEndTime = (coupon: Pick<Coupon, 'end_at'>) => (coupon.end_at ? new Date(coupon.end_at).getTime() : Number.MAX_SAFE_INTEGER)
 
 const getCouponDiscountScore = (coupon: Pick<Coupon, 'discount_type' | 'discount_value'>) => {
   if (!coupon.discount_value) {
@@ -94,7 +99,7 @@ function App() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortOption, setSortOption] = useState<'newest' | 'expiring' | 'best-discount'>('expiring')
+  const [sortOption, setSortOption] = useState<'newest' | 'expiring' | 'best-discount' | null>(null)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [selectedStoreSlug, setSelectedStoreSlug] = useState<string | null>(null)
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null)
@@ -102,6 +107,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [newCoupon, setNewCoupon] = useState<NewCoupon>(initialCouponState)
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
   const filterMenuContainerRef = useRef<HTMLDivElement | null>(null)
 
@@ -144,6 +150,21 @@ function App() {
     return () => window.removeEventListener('pointerdown', handlePointerDownOutsideMenu)
   }, [openFilterMenu])
 
+  useEffect(() => {
+    if (!isCouponModalOpen) {
+      return
+    }
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        resetCouponForm()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscapeKey)
+    return () => window.removeEventListener('keydown', handleEscapeKey)
+  }, [isCouponModalOpen])
+
   const fetchCoupons = async () => {
     const nowIso = new Date().toISOString()
     const { error: expireError } = await supabase
@@ -174,7 +195,12 @@ function App() {
         return aExpired ? 1 : -1
       }
 
-      return new Date(a.end_at).getTime() - new Date(b.end_at).getTime()
+      const rankDifference = getCouponRankValue(a) - getCouponRankValue(b)
+      if (rankDifference !== 0) {
+        return rankDifference
+      }
+
+      return getCouponEndTime(a) - getCouponEndTime(b)
     })
 
     setCoupons(sortedCoupons)
@@ -227,18 +253,23 @@ function App() {
     setNewCoupon((current) => ({ ...current, [field]: value }))
   }
 
-  const handleCategoryToggle = (categoryId: string) => {
+  const handleCategoryChange = (categoryIds: string[]) => {
     setNewCoupon((current) => ({
       ...current,
-      categoryIds: current.categoryIds.includes(categoryId)
-        ? current.categoryIds.filter((id) => id !== categoryId)
-        : [...current.categoryIds, categoryId]
+      categoryIds
     }))
   }
 
   const resetCouponForm = () => {
     setNewCoupon(initialCouponState)
     setEditingCouponId(null)
+    setIsCouponModalOpen(false)
+  }
+
+  const handleOpenNewCouponModal = () => {
+    setNewCoupon(initialCouponState)
+    setEditingCouponId(null)
+    setIsCouponModalOpen(true)
   }
 
   const uploadStoreLogo = async (storeSlug: string, file: File) => {
@@ -341,9 +372,11 @@ function App() {
         discount_type: newCoupon.discountType,
         discount_value: newCoupon.discountType === 'FREE_SHIPPING' ? null : newCoupon.discountValue || null,
         url: newCoupon.url || null,
-        end_at: newCoupon.endAt,
+        end_at: newCoupon.endAt.trim() === '' ? null : newCoupon.endAt,
+        rank: newCoupon.rank.trim() === '' ? null : Number(newCoupon.rank),
         is_verified: newCoupon.isVerified,
-        is_exclusive: newCoupon.isExclusive
+        is_exclusive: newCoupon.isExclusive,
+        is_limited_time: newCoupon.isLimitedTime
       }
 
       if (editingCouponId) {
@@ -390,13 +423,14 @@ function App() {
       code: coupon.coupon_code ?? '',
       description: coupon.description ?? '',
       url: coupon.url ?? '',
-      endAt: coupon.end_at.slice(0, 10),
+      endAt: coupon.end_at?.slice(0, 10) ?? '',
+      rank: coupon.rank?.toString() ?? '',
       isVerified: coupon.is_verified,
       isExclusive: coupon.is_exclusive,
+      isLimitedTime: coupon.is_limited_time,
       categoryIds: coupon.coupon_categories?.flatMap((link) => (link.categories?.id ? [link.categories.id] : [])) ?? []
     })
-
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setIsCouponModalOpen(true)
   }
 
   const handleDeleteCoupon = async (couponId: string) => {
@@ -461,7 +495,14 @@ function App() {
         return getCouponDiscountScore(b) - getCouponDiscountScore(a)
       }
 
-      return new Date(a.end_at).getTime() - new Date(b.end_at).getTime()
+      if (sortOption === null) {
+        const rankDifference = getCouponRankValue(a) - getCouponRankValue(b)
+        if (rankDifference !== 0) {
+          return rankDifference
+        }
+      }
+
+      return getCouponEndTime(a) - getCouponEndTime(b)
     })
   }, [coupons, searchTerm, selectedStoreSlug, selectedCategorySlug, verifiedOnly, sortOption])
 
@@ -477,23 +518,18 @@ function App() {
           <Link to="/" className="admin-btn">Back to Main</Link>
         </header>
         <main>
-          <AdminPanel
-            coupon={newCoupon}
-            categories={categories}
-            isEditing={editingCouponId !== null}
-            onChange={handleFieldChange}
-            onCategoryToggle={handleCategoryToggle}
-            onCancelEdit={resetCouponForm}
-            onFileChange={(file) => handleFieldChange('logoFile', file)}
-            onSubmit={handleSaveCoupon}
-          />
           <section className="admin-panel admin-coupon-list">
             <div className="admin-list-header">
               <div>
                 <h2>Existing Coupons</h2>
                 <p>Review current coupons, update their details, or remove outdated offers.</p>
               </div>
-              <span className="admin-count">{coupons.length} total</span>
+              <div className="admin-list-header-actions">
+                <span className="admin-count">{coupons.length} total</span>
+                <button type="button" className="admin-add-btn" onClick={handleOpenNewCouponModal}>
+                  Add New Coupon
+                </button>
+              </div>
             </div>
 
             <div className="admin-list-items">
@@ -506,7 +542,8 @@ function App() {
                       <p className="admin-coupon-store">{coupon.stores?.name ?? 'Unknown store'}</p>
                       <h3>{coupon.title}</h3>
                       <p className="admin-coupon-meta">
-                        Expires {new Date(coupon.end_at).toLocaleDateString()}
+                        {coupon.rank !== null ? `Rank ${coupon.rank} | ` : ''}
+                        {coupon.end_at ? `Expires ${new Date(coupon.end_at).toLocaleDateString()}` : 'No expiry'}
                         {coupon.coupon_code ? ` | Code: ${coupon.coupon_code}` : ''}
                       </p>
                     </div>
@@ -528,6 +565,29 @@ function App() {
               )}
             </div>
           </section>
+
+          {isCouponModalOpen && (
+            <div className="admin-modal-overlay" role="presentation" onClick={resetCouponForm}>
+              <div
+                className="admin-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="admin-coupon-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <AdminPanel
+                  coupon={newCoupon}
+                  categories={categories}
+                  isEditing={editingCouponId !== null}
+                  onChange={handleFieldChange}
+                  onCategoryChange={handleCategoryChange}
+                  onCancelEdit={resetCouponForm}
+                  onFileChange={(file) => handleFieldChange('logoFile', file)}
+                  onSubmit={handleSaveCoupon}
+                />
+              </div>
+            </div>
+          )}
         </main>
       </div>
     )
@@ -622,7 +682,7 @@ function App() {
 
         <div className="hero-content">
           <div>
-            <p className="eyebrow">Trusted Canadian coupon hub</p>
+            <p className="eyebrow">Trusted North American Biggest Discount/Deals hub</p>
             <p className="hero-copy">Search the latest coupons and deals across stores, categories, and exclusive offers.</p>
           </div>
         </div>
@@ -632,6 +692,13 @@ function App() {
         <section className="browse-controls">
           <div className="browse-sort">
             <span className="browse-label">Sort</span>
+            <button
+              type="button"
+              className={`browse-chip ${sortOption === null ? 'active' : ''}`}
+              onClick={() => setSortOption(null)}
+            >
+              Default
+            </button>
             <button
               type="button"
               className={`browse-chip ${sortOption === 'newest' ? 'active' : ''}`}

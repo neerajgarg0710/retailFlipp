@@ -26,9 +26,11 @@ export interface Coupon {
   discount_type: DiscountType | null
   discount_value: string | null
   url: string | null
-  end_at: string
+  end_at: string | null
+  rank: number | null
   is_verified: boolean
   is_exclusive: boolean
+  is_limited_time: boolean
   status: CouponStatus
   created_at: string | null
   updated_at: string | null
@@ -47,7 +49,9 @@ export interface NewCoupon {
   description: string
   url: string
   endAt: string
+  rank: string
   isVerified: boolean
   isExclusive: boolean
+  isLimitedTime: boolean
   categoryIds: string[]
 }

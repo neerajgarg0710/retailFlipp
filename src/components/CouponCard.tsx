@@ -12,8 +12,8 @@ const formatDiscount = (discountType: string | null | undefined) => {
 
 export default function CouponCard({ coupon }: CouponCardProps) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
-  const expiration = new Date(coupon.end_at).toLocaleDateString()
-  const isExpired = coupon.status === 'EXPIRED' || new Date(coupon.end_at).getTime() < Date.now()
+  const expirationLabel = coupon.end_at ? `Expires ${new Date(coupon.end_at).toLocaleDateString()}` : 'No expiry'
+  const isExpired = coupon.status === 'EXPIRED' || (coupon.end_at ? new Date(coupon.end_at).getTime() < Date.now() : false)
   const discountLabel = formatDiscount(coupon.discount_type)
   const storeName = coupon.stores?.name ?? 'Unknown store'
   const logoUrl = coupon.stores?.logo_url
@@ -122,7 +122,8 @@ export default function CouponCard({ coupon }: CouponCardProps) {
           {coupon.is_verified ? 'Verified' : 'Unverified'}
         </span>
         {coupon.is_exclusive && <span className="coupon-tag exclusive">Exclusive</span>}
-        <span className="coupon-expiry">Expires {expiration}</span>
+        {coupon.is_limited_time && <span className="coupon-tag limited-time">Limited Time</span>}
+        <span className="coupon-expiry">{expirationLabel}</span>
       </div>
     </div>
   )
